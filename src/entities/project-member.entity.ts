@@ -1,14 +1,6 @@
-import {
-  Entity,
-  PrimaryGeneratedColumn,
-  Column,
-  CreateDateColumn,
-  ManyToOne,
-  JoinColumn,
-  Index,
-} from 'typeorm';
-import { User } from './user.entity';
+import { Entity, Column, PrimaryGeneratedColumn, CreateDateColumn, ManyToOne, JoinColumn, Unique, Index } from 'typeorm';
 import { Project } from './project.entity';
+import { User } from './user.entity';
 
 export enum ProjectRole {
   ADMIN = 'admin',
@@ -17,10 +9,25 @@ export enum ProjectRole {
 }
 
 @Entity('project_members')
-@Index(['project', 'user'], { unique: true })
+@Unique(['projectId', 'userId'])
+@Index(['projectId', 'userId'])
 export class ProjectMember {
   @PrimaryGeneratedColumn('uuid')
   id: string;
+
+  @Column()
+  projectId: string;
+
+  @ManyToOne(() => Project, project => project.members, { onDelete: 'CASCADE' })
+  @JoinColumn({ name: 'projectId' })
+  project: Project;
+
+  @Column()
+  userId: string;
+
+  @ManyToOne(() => User)
+  @JoinColumn({ name: 'userId' })
+  user: User;
 
   @Column({
     type: 'enum',
@@ -30,14 +37,12 @@ export class ProjectMember {
   role: ProjectRole;
 
   @CreateDateColumn()
-  createdAt: Date;
+  joinedAt: Date;
 
-  // Relations
-  @ManyToOne(() => Project, (project) => project.collaborators, { onDelete: 'CASCADE' })
-  @JoinColumn({ name: 'project_id' })
-  project: Project;
+  @Column({ nullable: true })
+  invitedBy: string;
 
   @ManyToOne(() => User)
-  @JoinColumn({ name: 'user_id' })
-  user: User;
+  @JoinColumn({ name: 'invitedBy' })
+  inviter: User;
 }

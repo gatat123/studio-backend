@@ -1,0 +1,343 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// 사용자 모델
+model User {
+  id            String    @id @default(cuid())
+  email         String    @unique
+  password      String
+  nickname      String?
+  avatarUrl     String?
+  role          UserRole  @default(USER)
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  lastLoginAt   DateTime?
+  
+  // Relations
+  studios       StudioMember[]
+  projects      ProjectMember[]
+  scenes        Scene[]
+  comments      Comment[]
+  activities    Activity[]
+  inviteCodes   InviteCode[]
+  sessions      Session[]
+  
+  @@index([email])
+}
+
+// 세션 모델 (자동 저장 및 복구용)
+model Session {
+  id            String    @id @default(cuid())
+  userId        String
+  user          User      @relation(fields: [userId], references: [id])
+  token         String    @unique
+  data          Json?     // 세션 데이터 저장
+  expiresAt     DateTime
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  
+  @@index([token])
+  @@index([userId])
+}
+
+// 스튜디오 모델
+model Studio {
+  id            String    @id @default(cuid())
+  name          String
+  description   String?
+  logo          String?
+  inviteCode    String?   @unique
+  settings      Json?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  version       Int       @default(0) // 낙관적 락킹용
+  
+  // Relations
+  members       StudioMember[]
+  projects      Project[]
+  
+  @@index([inviteCode])
+}
+
+// 스튜디오 멤버
+model StudioMember {
+  id            String      @id @default(cuid())
+  studioId      String
+  studio        Studio      @relation(fields: [studioId], references: [id], onDelete: Cascade)
+  userId        String
+  user          User        @relation(fields: [userId], references: [id])
+  role          MemberRole  @default(VIEWER)
+  joinedAt      DateTime    @default(now())
+  
+  @@unique([studioId, userId])
+  @@index([studioId])
+  @@index([userId])
+}
+
+// 프로젝트 모델
+model Project {
+  id            String    @id @default(cuid())
+  studioId      String
+  studio        Studio    @relation(fields: [studioId], references: [id], onDelete: Cascade)
+  title         String
+  description   String?
+  category      ProjectCategory @default(STORYBOARD)
+  status        ProjectStatus   @default(PLANNING)
+  deadline      DateTime?
+  thumbnail     String?
+  inviteCode    String?   @unique
+  
+  // 삭제 관련 필드
+  deletedAt     DateTime?
+  deletedBy     String?
+  deleteType    DeleteType?
+  backupUrl     String?
+  
+  // 버전 관리
+  version       Int       @default(0) // 낙관적 락킹용
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  
+  // 자동 저장 관련
+  lastAutoSaveAt DateTime?
+  autoSaveData  Json?     // 임시 저장 데이터
+  
+  // Relations
+  members       ProjectMember[]
+  scenes        Scene[]
+  inviteCodes   InviteCode[]
+  activities    Activity[]
+  backups       Backup[]
+  
+  @@index([studioId])
+  @@index([inviteCode])
+  @@index([deletedAt])
+}
+
+// 프로젝트 멤버
+model ProjectMember {
+  id            String      @id @default(cuid())
+  projectId     String
+  project       Project     @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  userId        String
+  user          User        @relation(fields: [userId], references: [id])
+  role          MemberRole  @default(VIEWER)
+  joinedAt      DateTime    @default(now())
+  
+  @@unique([projectId, userId])
+  @@index([projectId])
+  @@index([userId])
+}
+
+// 씬 모델
+model Scene {
+  id            String    @id @default(cuid())
+  projectId     String
+  project       Project   @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  order         Int
+  title         String?
+  description   String?
+  
+  // 이미지 버전
+  draftUrl      String?
+  draftVersion  Int       @default(0)
+  artworkUrl    String?
+  artworkVersion Int      @default(0)
+  
+  status        SceneStatus @default(EMPTY)
+  tags          String[]
+  metadata      Json?
+  
+  // 버전 관리
+  version       Int       @default(0) // 낙관적 락킹용
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  uploadedBy    String?
+  uploader      User?     @relation(fields: [uploadedBy], references: [id])
+  
+  // 자동 저장
+  autoSaveData  Json?     // 임시 저장 데이터
+  lastAutoSaveAt DateTime?
+  
+  // Relations
+  comments      Comment[]
+  history       SceneHistory[]
+  
+  @@index([projectId])
+  @@index([order])
+}
+
+// 씬 버전 히스토리
+model SceneHistory {
+  id            String    @id @default(cuid())
+  sceneId       String
+  scene         Scene     @relation(fields: [sceneId], references: [id], onDelete: Cascade)
+  version       Int
+  type          String    // draft or artwork
+  url           String
+  uploadedBy    String
+  uploadedAt    DateTime  @default(now())
+  metadata      Json?
+  
+  @@index([sceneId])
+  @@index([version])
+}
+
+// 댓글 모델
+model Comment {
+  id            String    @id @default(cuid())
+  sceneId       String
+  scene         Scene     @relation(fields: [sceneId], references: [id], onDelete: Cascade)
+  userId        String
+  user          User      @relation(fields: [userId], references: [id])
+  content       String
+  
+  // 위치 기반 댓글
+  positionX     Float?
+  positionY     Float?
+  page          Int?
+  
+  // 상태
+  resolved      Boolean   @default(false)
+  pinned        Boolean   @default(false)
+  
+  // 버전 관리
+  version       Int       @default(0)
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  
+  // 스레드
+  parentId      String?
+  parent        Comment?  @relation("CommentThread", fields: [parentId], references: [id])
+  replies       Comment[] @relation("CommentThread")
+  
+  @@index([sceneId])
+  @@index([userId])
+  @@index([parentId])
+}
+
+// 초대코드 모델
+model InviteCode {
+  id            String    @id @default(cuid())
+  code          String    @unique
+  projectId     String
+  project       Project   @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  type          InviteType @default(PERMANENT)
+  maxUses       Int?
+  usedCount     Int       @default(0)
+  expiresAt     DateTime?
+  role          MemberRole @default(VIEWER)
+  createdBy     String
+  creator       User      @relation(fields: [createdBy], references: [id])
+  createdAt     DateTime  @default(now())
+  
+  @@index([code])
+  @@index([projectId])
+}
+
+// 활동 로그
+model Activity {
+  id            String    @id @default(cuid())
+  projectId     String
+  project       Project   @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  userId        String
+  user          User      @relation(fields: [userId], references: [id])
+  action        ActionType
+  target        String
+  targetId      String
+  details       String?
+  metadata      Json?
+  timestamp     DateTime  @default(now())
+  
+  @@index([projectId])
+  @@index([userId])
+  @@index([timestamp])
+}
+
+// 백업 모델 (자동 백업용)
+model Backup {
+  id            String    @id @default(cuid())
+  projectId     String
+  project       Project   @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  type          BackupType
+  data          Json      // 백업 데이터
+  url           String?   // 외부 저장소 URL
+  size          Int?      // 백업 크기 (bytes)
+  createdAt     DateTime  @default(now())
+  expiresAt     DateTime? // 백업 만료 시간
+  
+  @@index([projectId])
+  @@index([createdAt])
+}
+
+// Enums
+enum UserRole {
+  USER
+  ADMIN
+  SUPER_ADMIN
+}
+
+enum MemberRole {
+  VIEWER
+  EDITOR
+  ADMIN
+}
+
+enum ProjectCategory {
+  WEBTOON
+  ILLUSTRATION
+  STORYBOARD
+  CONCEPT
+}
+
+enum ProjectStatus {
+  PLANNING
+  IN_PROGRESS
+  REVIEW
+  COMPLETED
+  ARCHIVED
+  DELETED
+}
+
+enum SceneStatus {
+  EMPTY
+  DRAFT
+  REVIEW
+  APPROVED
+}
+
+enum InviteType {
+  ONE_TIME
+  PERMANENT
+  LIMITED
+}
+
+enum DeleteType {
+  SOFT
+  IMMEDIATE
+  ARCHIVED
+}
+
+enum ActionType {
+  CREATE
+  UPDATE
+  DELETE
+  COMMENT
+  UPLOAD
+  INVITE
+  JOIN
+  LEAVE
+}
+
+enum BackupType {
+  AUTO      // 자동 백업
+  MANUAL    // 수동 백업
+  DELETION  // 삭제 전 백업
+  SCHEDULE  // 스케줄 백업
+}

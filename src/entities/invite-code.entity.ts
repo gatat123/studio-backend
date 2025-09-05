@@ -1,15 +1,6 @@
-import {
-  Entity,
-  PrimaryGeneratedColumn,
-  Column,
-  CreateDateColumn,
-  ManyToOne,
-  JoinColumn,
-  Index,
-} from 'typeorm';
+import { Entity, Column, PrimaryGeneratedColumn, CreateDateColumn, ManyToOne, JoinColumn, Index } from 'typeorm';
 import { Project } from './project.entity';
 import { User } from './user.entity';
-import { ProjectRole } from './project-member.entity';
 
 export enum InviteType {
   ONE_TIME = 'one_time',
@@ -17,14 +8,28 @@ export enum InviteType {
   LIMITED = 'limited',
 }
 
+export enum InviteRole {
+  VIEWER = 'viewer',
+  EDITOR = 'editor',
+  ADMIN = 'admin',
+}
+
 @Entity('invite_codes')
+@Index(['code'])
+@Index(['projectId'])
 export class InviteCode {
   @PrimaryGeneratedColumn('uuid')
   id: string;
 
-  @Index({ unique: true })
   @Column({ unique: true })
   code: string;
+
+  @Column()
+  projectId: string;
+
+  @ManyToOne(() => Project, project => project.inviteCodes, { onDelete: 'CASCADE' })
+  @JoinColumn({ name: 'projectId' })
+  project: Project;
 
   @Column({
     type: 'enum',
@@ -44,20 +49,18 @@ export class InviteCode {
 
   @Column({
     type: 'enum',
-    enum: ProjectRole,
-    default: ProjectRole.VIEWER,
+    enum: InviteRole,
+    default: InviteRole.VIEWER,
   })
-  role: ProjectRole;
+  role: InviteRole;
+
+  @Column()
+  createdBy: string;
+
+  @ManyToOne(() => User)
+  @JoinColumn({ name: 'createdBy' })
+  creator: User;
 
   @CreateDateColumn()
   createdAt: Date;
-
-  // Relations
-  @ManyToOne(() => Project, (project) => project.inviteCodes, { onDelete: 'CASCADE' })
-  @JoinColumn({ name: 'project_id' })
-  project: Project;
-
-  @ManyToOne(() => User)
-  @JoinColumn({ name: 'created_by' })
-  createdBy: User;
 }
