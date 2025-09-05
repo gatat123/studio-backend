@@ -360,8 +360,6 @@ export class ScenesController {
 
     return this.scenesService.update(id, updates, req.user.id);
   }
-}
-
 
   // ==================== 버전 관리 API ====================
 
