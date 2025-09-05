@@ -10,6 +10,10 @@ import { StudiosModule } from './studios/studios.module';
 import { ProjectsModule } from './projects/projects.module';
 import { ScenesModule } from './scenes/scenes.module';
 import { CommentsModule } from './comments/comments.module';
+import { SecurityModule } from './security/security.module';
+import { NotificationsModule } from './notifications/notifications.module';
+import { EmailModule } from './email/email.module';
+import { PerformanceModule } from './performance/performance.module';
 
 @Module({
   imports: [
@@ -28,6 +32,10 @@ import { CommentsModule } from './comments/comments.module';
     ProjectsModule,
     ScenesModule,
     CommentsModule,
+    SecurityModule,
+    NotificationsModule,
+    EmailModule,
+    PerformanceModule,
   ],
   controllers: [AppController],
   providers: [AppService],

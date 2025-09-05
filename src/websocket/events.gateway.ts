@@ -148,4 +148,23 @@ export class EventsGateway
   broadcastCommentDelete(projectId: string, commentId: string) {
     this.server.to(`project:${projectId}`).emit('comment:delete', { commentId });
   }
+
+  // 알림 전송
+  sendNotification(userId: string, notificationData: any) {
+    // Find the socket ID for the user
+    for (const [socketId, user] of this.connectedUsers.entries()) {
+      if (user.userId === userId) {
+        this.server.to(socketId).emit('notification:new', notificationData);
+        this.logger.debug(`Notification sent to user ${userId}`);
+        break;
+      }
+    }
+  }
+
+  // 다중 사용자에게 알림 전송
+  sendNotificationToMultiple(userIds: string[], notificationData: any) {
+    for (const userId of userIds) {
+      this.sendNotification(userId, notificationData);
+    }
+  }
 }
